@@ -20,7 +20,7 @@
             background: #fff;
             border-radius: 28px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.10);
-            max-width: 900px;
+            max-width: 1100px;
             width: 100%;
             padding: 32px 36px 40px;
             transition: 0.25s;
@@ -137,7 +137,7 @@
         .preview-wrap .placeholder { color: #6a7f9a; font-size: 14px; padding: 28px; text-align: center; }
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px,1fr));
+            grid-template-columns: repeat(auto-fill, minmax(200px,1fr));
             gap: 18px;
             margin-top: 10px;
         }
@@ -148,8 +148,10 @@
             overflow: hidden;
             transition: 0.2s;
             position: relative;
+            cursor: pointer;
         }
-        .grid-item:hover { border-color: #bcc8d6; }
+        .grid-item:hover { border-color: #2a6df4; box-shadow: 0 2px 8px rgba(42,109,244,0.15); }
+        .grid-item.selected { border-color: #2a6df4; box-shadow: 0 0 0 3px rgba(42,109,244,0.3); }
         .grid-item video { width: 100%; display: block; aspect-ratio: 16/9; background: #121a26; object-fit: contain; }
         .grid-item .label {
             padding: 8px 14px;
@@ -165,6 +167,21 @@
         }
         .grid-item .label .mic-indicator { font-size: 14px; opacity: 0.6; }
         .grid-item .label .mic-indicator.on { opacity: 1; color: #2a6df4; }
+        .grid-item .actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .grid-item .actions button {
+            background: none;
+            border: 1px solid #dde3ea;
+            border-radius: 30px;
+            padding: 4px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .grid-item .actions button:hover { background: #fee8e8; border-color: #e05353; color: #b12222; }
         .empty-grid { color: #6a7f9a; text-align: center; padding: 48px 20px; font-size: 15px; background: #f7faff; border-radius: 16px; border: 1.5px dashed #dde3ea; }
         .it-bar {
             display: flex;
@@ -185,6 +202,48 @@
             border-radius: 30px;
             font-weight: 500;
         }
+        .it-main {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .it-focus {
+            background: #f7faff;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            padding: 16px;
+        }
+        .it-focus .placeholder {
+            color: #6a7f9a;
+            text-align: center;
+            padding: 40px 20px;
+            font-size: 15px;
+        }
+        .it-focus video {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #121a26;
+            object-fit: contain;
+            border-radius: 12px;
+        }
+        .it-focus .focus-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 4px;
+            font-weight: 500;
+        }
+        .it-focus .focus-label .focus-actions button {
+            background: none;
+            border: 1px solid #dde3ea;
+            border-radius: 30px;
+            padding: 4px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-left: 8px;
+        }
+        .it-focus .focus-label .focus-actions button:hover { background: #fee8e8; border-color: #e05353; }
         .hidden { display: none !important; }
         .mt-2 { margin-top: 12px; }
         .flex { display: flex; align-items: center; gap: 8px; }
@@ -205,6 +264,14 @@
         .header-btn:hover { background: #f0f4fa; border-color: #bcc8d6; }
         .header-btn.primary { background: #2a6df4; color: #fff; border-color: #2a6df4; }
         .header-btn.primary:hover { background: #1a5ad8; }
+        .user-status {
+            font-size: 13px;
+            color: #5b6f87;
+            padding: 4px 12px;
+            background: #eef2f6;
+            border-radius: 30px;
+        }
+        .user-status.viewing { background: #dff0d8; color: #1d6b2b; }
         @media (max-width:600px) {
             .app { padding: 20px 16px; }
             .controls .btn { padding: 8px 16px; font-size: 13px; }
@@ -226,6 +293,7 @@
                 <small>User</small>
             </h1>
             <span class="status-badge" id="connectionStatus">● connecting</span>
+            <span id="userViewingStatus" class="user-status">👀 Not being viewed</span>
             <button class="header-btn primary" id="itLoginBtn">🔐 IT Login</button>
         </header>
         <hr />
@@ -294,9 +362,26 @@
             <span style="font-size:13px; color:#5b6f87; margin-left:auto;" id="itStatusText">Ready</span>
         </div>
 
-        <div id="gridContainer">
-            <div class="grid" id="streamGrid"></div>
-            <div class="empty-grid" id="emptyGrid">No users sharing their screen yet.</div>
+        <div class="it-main">
+            <!-- Focused user (large view) -->
+            <div class="it-focus" id="itFocusArea">
+                <div class="placeholder" id="focusPlaceholder">Click on a user below to view and support them.</div>
+                <div id="focusContent" class="hidden">
+                    <video id="focusVideo" autoplay playsinline muted></video>
+                    <div class="focus-label">
+                        <span id="focusName">User</span>
+                        <span class="focus-actions">
+                            <button id="focusDisconnectBtn">🔌 Disconnect</button>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User grid -->
+            <div id="gridContainer">
+                <div class="grid" id="streamGrid"></div>
+                <div class="empty-grid" id="emptyGrid">No users sharing their screen yet.</div>
+            </div>
         </div>
     </div>
 
@@ -351,6 +436,7 @@
         const streamStatus = document.getElementById('streamStatus');
         const connectionStatus = document.getElementById('connectionStatus');
         const itLoginBtn = document.getElementById('itLoginBtn');
+        const userViewingStatus = document.getElementById('userViewingStatus');
 
         // ─── IT DOM ──────────────────────────────────
         const itConnectionStatus = document.getElementById('itConnectionStatus');
@@ -361,6 +447,11 @@
         const itSpeakerBtn = document.getElementById('itSpeakerBtn');
         const itStatusText = document.getElementById('itStatusText');
         const backToUserBtn = document.getElementById('backToUserBtn');
+        const focusPlaceholder = document.getElementById('focusPlaceholder');
+        const focusContent = document.getElementById('focusContent');
+        const focusVideo = document.getElementById('focusVideo');
+        const focusName = document.getElementById('focusName');
+        const focusDisconnectBtn = document.getElementById('focusDisconnectBtn');
 
         // ────────────────────────────────────────────────
         //  STATE
@@ -377,7 +468,9 @@
 
         let peerConnection = null;
 
+        // IT side: map userId -> { name, pc, stream, micOn, element, videoEl, micInd }
         const userPeers = new Map();
+        let focusedUserId = null; // currently selected user ID
 
         let itMicStream = null;
         let isItMicOn = false;
@@ -439,12 +532,22 @@
                     alert('The IT session has ended.');
                     leaveSession();
                 });
+                // IT focusing on this user
+                socket.on('it-focus', (data) => {
+                    userViewingStatus.textContent = '👀 IT is viewing you';
+                    userViewingStatus.className = 'user-status viewing';
+                });
+                socket.on('it-unfocus', () => {
+                    userViewingStatus.textContent = '👀 Not being viewed';
+                    userViewingStatus.className = 'user-status';
+                });
             }
 
             // ─── IT EVENTS ─────────────────────────────
             if (isIT) {
                 socket.on('user-joined', (data) => {
                     itStatusText.textContent = `User ${data.name} joined`;
+                    // Auto-refresh: we'll add placeholder when offer arrives
                 });
                 socket.on('user-offer', async (data) => {
                     await handleUserOffer(data.userId, data.name, data.sdp);
@@ -459,6 +562,9 @@
                     } catch (e) { console.warn('ICE add error:', e); }
                 });
                 socket.on('user-left', (data) => {
+                    if (focusedUserId === data.userId) {
+                        clearFocus();
+                    }
                     removeUser(data.userId);
                 });
                 socket.on('user-mic-state', (data) => {
@@ -466,6 +572,9 @@
                     if (peer) {
                         peer.micOn = data.on;
                         updateGridItemMic(data.userId, data.on);
+                        if (focusedUserId === data.userId) {
+                            // update focus mic indicator (optional)
+                        }
                     }
                 });
                 socket.on('existing-users', (users) => {
@@ -523,6 +632,12 @@
         }
 
         async function toggleScreenShare() {
+            // Check if on iOS Safari (no getDisplayMedia)
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            if (isIOS) {
+                alert('Screen sharing is not supported on iOS Safari. Please use a desktop browser.');
+                return;
+            }
             if (isScreenSharing) { stopScreenShare(); return; }
             try {
                 const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -664,6 +779,10 @@
                     <span>${escapeHtml(name)}</span>
                     <span class="mic-indicator" id="mic-ind-${userId}">🔇</span>
                 </div>
+                <div class="actions" style="padding:4px 12px 8px;">
+                    <button class="focus-btn" data-userid="${userId}">👁️ Focus</button>
+                    <button class="disconnect-btn" data-userid="${userId}">🔌 Disconnect</button>
+                </div>
             `;
             streamGrid.appendChild(item);
             emptyGrid.classList.add('hidden');
@@ -676,6 +795,17 @@
                 videoEl: item.querySelector('video'),
                 micInd: item.querySelector('.mic-indicator'),
             });
+            // Attach event listeners
+            item.querySelector('.focus-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                focusUser(userId);
+            });
+            item.querySelector('.disconnect-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                disconnectUser(userId);
+            });
+            // Click on item also focuses
+            item.addEventListener('click', () => focusUser(userId));
             updateUserCount();
         }
 
@@ -701,6 +831,12 @@
                             peer.stream = stream;
                             videoEl.play().catch(() => {});
                         }
+                        // If this user is focused, also update focus video
+                        if (focusedUserId === userId) {
+                            const focusStream = new MediaStream([event.track]);
+                            focusVideo.srcObject = focusStream;
+                            focusVideo.play().catch(() => {});
+                        }
                     } else if (event.track.kind === 'audio') {
                         const audioEl = new Audio();
                         audioEl.srcObject = new MediaStream([event.track]);
@@ -710,6 +846,11 @@
                         if (peer.micOn) {
                             peer.micInd.textContent = '🎤';
                             peer.micInd.className = 'mic-indicator on';
+                        }
+                        // If this user is focused, unmute audio for focus
+                        if (focusedUserId === userId) {
+                            audioEl.muted = false;
+                            // Also we may want to attach to focus audio? But we already have audio element.
                         }
                     }
                 };
@@ -740,6 +881,7 @@
                 userPeers.delete(userId);
                 updateUserCount();
                 if (userPeers.size === 0) emptyGrid.classList.remove('hidden');
+                if (focusedUserId === userId) clearFocus();
             }
         }
 
@@ -759,6 +901,88 @@
             else emptyGrid.classList.remove('hidden');
         }
 
+        // ─── FOCUS ──────────────────────────────────────
+        function focusUser(userId) {
+            const peer = userPeers.get(userId);
+            if (!peer) return;
+            // Clear previous focus
+            clearFocus();
+            focusedUserId = userId;
+            // Update UI
+            focusPlaceholder.classList.add('hidden');
+            focusContent.classList.remove('hidden');
+            focusName.textContent = peer.name;
+            // Get video stream from peer
+            if (peer.stream) {
+                // We need to get the video track from the existing stream
+                const videoTrack = peer.stream.getVideoTracks()[0];
+                if (videoTrack) {
+                    const newStream = new MediaStream([videoTrack]);
+                    focusVideo.srcObject = newStream;
+                    focusVideo.play().catch(() => {});
+                }
+            } else {
+                // No stream yet – we'll receive it via ontrack later
+                focusVideo.srcObject = null;
+            }
+            // Notify user that IT is viewing them
+            socket.emit('it-focus', { userId });
+            // Also we need to unmute audio for this user – we can find the audio track in the peer connection
+            // We'll do that by looking at the PC receivers
+            if (peer.pc) {
+                const receivers = peer.pc.getReceivers();
+                receivers.forEach(r => {
+                    if (r.track && r.track.kind === 'audio') {
+                        r.track.enabled = true;
+                        if (r.track._audioElement) {
+                            r.track._audioElement.muted = false;
+                        }
+                    }
+                });
+            }
+            // Highlight the grid item
+            document.querySelectorAll('.grid-item').forEach(el => el.classList.remove('selected'));
+            if (peer.element) peer.element.classList.add('selected');
+        }
+
+        function clearFocus() {
+            if (focusedUserId) {
+                // Notify user that IT stopped viewing
+                socket.emit('it-unfocus', { userId: focusedUserId });
+                // Mute audio for that user if needed
+                const peer = userPeers.get(focusedUserId);
+                if (peer && peer.pc) {
+                    const receivers = peer.pc.getReceivers();
+                    receivers.forEach(r => {
+                        if (r.track && r.track.kind === 'audio') {
+                            r.track.enabled = isItSpeakerOn; // mute if speaker off
+                            if (r.track._audioElement) {
+                                r.track._audioElement.muted = !isItSpeakerOn;
+                            }
+                        }
+                    });
+                }
+                // Remove highlight
+                if (peer && peer.element) peer.element.classList.remove('selected');
+                focusedUserId = null;
+            }
+            focusPlaceholder.classList.remove('hidden');
+            focusContent.classList.add('hidden');
+            focusVideo.srcObject = null;
+            focusName.textContent = '';
+        }
+
+        // ─── DISCONNECT ──────────────────────────────────
+        function disconnectUser(userId) {
+            if (!confirm(`Disconnect user ${userPeers.get(userId)?.name || userId}?`)) return;
+            // Emit disconnect event to server
+            socket.emit('it-disconnect-user', { userId });
+            // Also remove locally
+            removeUser(userId);
+            if (focusedUserId === userId) clearFocus();
+        }
+
+        // ─── IT MIC ─────────────────────────────────────
         async function toggleItMic() {
             if (isItMicOn) {
                 if (itMicStream) { itMicStream.getTracks().forEach(t => t.stop()); itMicStream = null; }
@@ -810,8 +1034,17 @@
                     const receivers = peer.pc.getReceivers();
                     receivers.forEach(r => {
                         if (r.track && r.track.kind === 'audio') {
-                            r.track.enabled = isItSpeakerOn;
-                            if (r.track._audioElement) r.track._audioElement.muted = !isItSpeakerOn;
+                            // If focused, keep unmuted regardless of speaker? We'll apply speaker state if not focused.
+                            const isFocused = focusedUserId && userPeers.get(focusedUserId) === peer;
+                            if (!isFocused) {
+                                r.track.enabled = isItSpeakerOn;
+                                if (r.track._audioElement) r.track._audioElement.muted = !isItSpeakerOn;
+                            } else {
+                                // For focused, we keep audio enabled, but speaker setting can still mute if off
+                                // Actually, we want speaker to control all, so we apply to focused too
+                                r.track.enabled = isItSpeakerOn;
+                                if (r.track._audioElement) r.track._audioElement.muted = !isItSpeakerOn;
+                            }
                         }
                     });
                 }
@@ -866,6 +1099,10 @@
                 url.searchParams.delete('it');
                 window.location.href = url.toString();
             });
+
+            focusDisconnectBtn.addEventListener('click', () => {
+                if (focusedUserId) disconnectUser(focusedUserId);
+            });
         }
 
         // ────────────────────────────────────────────────
@@ -884,6 +1121,11 @@
             initSocket();
             emptyGrid.classList.remove('hidden');
             itStatusText.textContent = 'Waiting for users...';
+            // Auto-refresh: we already update via socket events
+            // Also we can set a periodic check if needed
+            setInterval(() => {
+                // Just to keep the UI responsive, but socket events handle it
+            }, 5000);
         }
 
         console.log(`🚀 Remote Support - ${isUser ? 'User' : 'IT'} mode`);
