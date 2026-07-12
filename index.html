@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Remote Support</title>
+    <style>
+        /* ---------- RESET & BASE (same as before) ---------- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f4f8;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .app {
+            background: #fff;
+            border-radius: 28px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.10);
+            max-width: 900px;
+            width: 100%;
+            padding: 32px 36px 40px;
+            transition: 0.25s;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #0b1a33;
+            letter-spacing: -0.3px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h1 small {
+            font-size: 14px;
+            font-weight: 400;
+            color: #5b6f87;
+            margin-left: auto;
+        }
+        hr { border: none; border-top: 1px solid #e9edf2; margin: 18px 0 22px; }
+        .join-area {
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .join-area label { font-weight: 500; color: #1a2a41; }
+        .join-area input {
+            flex: 1;
+            min-width: 180px;
+            padding: 10px 16px;
+            border: 1.5px solid #dde3ea;
+            border-radius: 12px;
+            font-size: 15px;
+            outline: none;
+            transition: 0.2s;
+        }
+        .join-area input:focus {
+            border-color: #2a6df4;
+            box-shadow: 0 0 0 3px rgba(42,109,244,0.15);
+        }
+        .join-area button {
+            padding: 10px 28px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 500;
+            background: #2a6df4;
+            color: #fff;
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+        .join-area button:hover { background: #1a5ad8; transform: scale(1.01); }
+        .join-area button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .status-badge {
+            font-size: 13px;
+            padding: 4px 14px;
+            border-radius: 30px;
+            background: #eef2f6;
+            color: #2f4058;
+            font-weight: 500;
+        }
+        .status-badge.online { background: #dff0d8; color: #1d6b2b; }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 16px;
+            margin-top: 6px;
+            align-items: center;
+        }
+        .controls .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 22px;
+            border-radius: 40px;
+            border: 1.5px solid #dde3ea;
+            background: #fafcfe;
+            font-size: 14px;
+            font-weight: 500;
+            color: #1a2a41;
+            cursor: pointer;
+            transition: 0.2s;
+            user-select: none;
+        }
+        .controls .btn:hover { background: #f0f4fa; border-color: #bcc8d6; }
+        .controls .btn.active { background: #e3edfe; border-color: #2a6df4; color: #1a4fbf; }
+        .controls .btn.active-mic { background: #fee8e8; border-color: #e05353; color: #b12222; }
+        .controls .btn .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #bcc8d6;
+            display: inline-block;
+            transition: 0.2s;
+        }
+        .controls .btn.active .dot { background: #2a6df4; }
+        .controls .btn.active-mic .dot { background: #e05353; }
+        .btn-icon { font-size: 18px; line-height: 1; }
+        .preview-wrap {
+            margin-top: 16px;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #e9edf2;
+            position: relative;
+            min-height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #dde3ea;
+        }
+        .preview-wrap video { width: 100%; display: block; background: #121a26; aspect-ratio: 16 / 9; object-fit: contain; }
+        .preview-wrap .placeholder { color: #6a7f9a; font-size: 14px; padding: 28px; text-align: center; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px,1fr));
+            gap: 18px;
+            margin-top: 10px;
+        }
+        .grid-item {
+            background: #f7faff;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            transition: 0.2s;
+            position: relative;
+        }
+        .grid-item:hover { border-color: #bcc8d6; }
+        .grid-item video { width: 100%; display: block; aspect-ratio: 16/9; background: #121a26; object-fit: contain; }
+        .grid-item .label {
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #1a2a41;
+            background: #ffffffcc;
+            backdrop-filter: blur(4px);
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .grid-item .label .mic-indicator { font-size: 14px; opacity: 0.6; }
+        .grid-item .label .mic-indicator.on { opacity: 1; color: #2a6df4; }
+        .empty-grid { color: #6a7f9a; text-align: center; padding: 48px 20px; font-size: 15px; background: #f7faff; border-radius: 16px; border: 1.5px dashed #dde3ea; }
+        .it-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px 18px;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background: #f7faff;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+        }
+        .it-bar .badge {
+            font-size: 13px;
+            color: #2f4058;
+            background: #eef2f6;
+            padding: 4px 14px;
+            border-radius: 30px;
+            font-weight: 500;
+        }
+        .hidden { display: none !important; }
+        .mt-2 { margin-top: 12px; }
+        .flex { display: flex; align-items: center; gap: 8px; }
+        .gap-2 { gap: 10px; }
+        .text-muted { color: #6a7f9a; font-size: 14px; }
+        .w-full { width: 100%; }
+        /* small header buttons */
+        .header-btn {
+            background: none;
+            border: 1px solid #dde3ea;
+            border-radius: 30px;
+            padding: 6px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #2f4058;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .header-btn:hover { background: #f0f4fa; border-color: #bcc8d6; }
+        .header-btn.primary { background: #2a6df4; color: #fff; border-color: #2a6df4; }
+        .header-btn.primary:hover { background: #1a5ad8; }
+        @media (max-width:600px) {
+            .app { padding: 20px 16px; }
+            .controls .btn { padding: 8px 16px; font-size: 13px; }
+            .grid { grid-template-columns: 1fr 1fr; }
+            .join-area input { min-width: 120px; }
+        }
+        @media (max-width:420px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+    <!-- ============================================================ -->
+    <!--  USER PAGE                                                   -->
+    <!-- ============================================================ -->
+    <div class="app" id="userApp">
+        <header style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <h1>
+                🖥️ Remote Support
+                <small>User</small>
+            </h1>
+            <span class="status-badge" id="connectionStatus">● connecting</span>
+            <!-- IT Login Button -->
+            <button class="header-btn primary" id="itLoginBtn">🔐 IT Login</button>
+        </header>
+        <hr />
+
+        <!-- JOIN -->
+        <div class="join-area" id="joinArea">
+            <label for="userNameInput">Your name</label>
+            <input type="text" id="userNameInput" placeholder="e.g. Alice" value="User" />
+            <button id="joinBtn">Join</button>
+        </div>
+
+        <!-- MAIN CONTROLS (visible after join) -->
+        <div id="userControls" class="hidden">
+            <div class="controls">
+                <button class="btn" id="shareBtn">
+                    <span class="btn-icon">🖥️</span> Share Screen
+                    <span class="dot"></span>
+                </button>
+                <button class="btn" id="micBtn">
+                    <span class="btn-icon">🎤</span> Mic
+                    <span class="dot"></span>
+                </button>
+                <button class="btn" id="speakerBtn">
+                    <span class="btn-icon">🔊</span> Speaker
+                    <span class="dot"></span>
+                </button>
+                <button class="btn" id="leaveBtn" style="border-color:#f0d0d0; color:#a33;">
+                    <span class="btn-icon">🚪</span> Leave
+                </button>
+            </div>
+            <div class="preview-wrap" id="previewWrap">
+                <video id="selfPreview" autoplay muted playsinline></video>
+                <div class="placeholder" id="previewPlaceholder">
+                    Your screen will appear here when you share.
+                </div>
+            </div>
+            <div style="margin-top:10px; font-size:13px; color:#5b6f87; display:flex; gap:18px; flex-wrap:wrap;">
+                <span id="userNameDisplay">👤 </span>
+                <span id="streamStatus">📡 not sharing</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  IT PAGE                                                    -->
+    <!-- ============================================================ -->
+    <div class="app hidden" id="itApp">
+        <header style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <h1>
+                🛠️ IT Control Panel
+                <small>Support</small>
+            </h1>
+            <span class="status-badge" id="itConnectionStatus">● connecting</span>
+            <!-- Back to User button -->
+            <button class="header-btn" id="backToUserBtn">← Back to User</button>
+        </header>
+        <hr />
+
+        <div class="it-bar">
+            <span class="badge" id="userCountBadge">👥 0 users</span>
+            <button class="btn" id="itMicBtn">
+                <span class="btn-icon">🎤</span> IT Mic
+                <span class="dot"></span>
+            </button>
+            <button class="btn" id="itSpeakerBtn">
+                <span class="btn-icon">🔊</span> Speaker
+                <span class="dot"></span>
+            </button>
+            <span style="font-size:13px; color:#5b6f87; margin-left:auto;" id="itStatusText">Ready</span>
+        </div>
+
+        <div id="gridContainer">
+            <div class="grid" id="streamGrid"></div>
+            <div class="empty-grid" id="emptyGrid">No users sharing their screen yet.</div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  SOCKET.IO & APP JS                                           -->
+    <!-- ============================================================ -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js">
+    </script>
+    <script>
+        // ────────────────────────────────────────────────
+        //  CONFIG
+        // ────────────────────────────────────────────────
+        const CONFIG = {
+            serverUrl: window.location.origin,
+            stunServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+        };
+        // Hardcoded IT password (change as needed)
+        const IT_PASSWORD = 'Supportealge2026';
+
+        // ────────────────────────────────────────────────
+        //  DETECT MODE (via URL parameter ?it=1)
+        // ────────────────────────────────────────────────
+        const urlParams = new URLSearchParams(window.location.search);
+        const isIT = urlParams.get('it') === '1' || window.location.pathname.endsWith('it.html');
+        const isUser = !isIT;
+
+        // ────────────────────────────────────────────────
+        //  DOM REFS (user)
+        // ────────────────────────────────────────────────
+        const userApp = document.getElementById('userApp');
+        const itApp = document.getElementById('itApp');
+
+        // show the right app
+        if (isUser) {
+            userApp.classList.remove('hidden');
+            itApp.classList.add('hidden');
+        } else {
+            userApp.classList.add('hidden');
+            itApp.classList.remove('hidden');
+        }
+
+        // ─── USER DOM ──────────────────────────────────
+        const joinArea = document.getElementById('joinArea');
+        const userNameInput = document.getElementById('userNameInput');
+        const joinBtn = document.getElementById('joinBtn');
+        const userControls = document.getElementById('userControls');
+        const shareBtn = document.getElementById('shareBtn');
+        const micBtn = document.getElementById('micBtn');
+        const speakerBtn = document.getElementById('speakerBtn');
+        const leaveBtn = document.getElementById('leaveBtn');
+        const selfPreview = document.getElementById('selfPreview');
+        const previewPlaceholder = document.getElementById('previewPlaceholder');
+        const userNameDisplay = document.getElementById('userNameDisplay');
+        const streamStatus = document.getElementById('streamStatus');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const itLoginBtn = document.getElementById('itLoginBtn');
+
+        // ─── IT DOM ──────────────────────────────────
+        const itConnectionStatus = document.getElementById('itConnectionStatus');
+        const streamGrid = document.getElementById('streamGrid');
+        const emptyGrid = document.getElementById('emptyGrid');
+        const userCountBadge = document.getElementById('userCountBadge');
+        const itMicBtn = document.getElementById('itMicBtn');
+        const itSpeakerBtn = document.getElementById('itSpeakerBtn');
+        const itStatusText = document.getElementById('itStatusText');
+        const backToUserBtn = document.getElementById('backToUserBtn');
+
+        // ────────────────────────────────────────────────
+        //  STATE
+        // ────────────────────────────────────────────────
+        let socket = null;
+        let userName = '';
+        let isJoined = false;
+
+        // User media
+        let screenStream = null;
+        let micStream = null;
+        let isScreenSharing = false;
+        let isMicOn = false;
+        let isSpeakerOn = false;
+
+        // WebRTC peer connection (user ↔ IT)
+        let peerConnection = null;
+
+        // IT state: map userId -> { pc, stream, name, micOn }
+        const userPeers = new Map();
+
+        // IT's own mic
+        let itMicStream = null;
+        let isItMicOn = false;
+        let isItSpeakerOn = true;
+
+        // ────────────────────────────────────────────────
+        //  SOCKET
+        // ────────────────────────────────────────────────
+        function initSocket() {
+            socket = io(CONFIG.serverUrl, {
+                transports: ['websocket', 'polling'],
+            });
+
+            socket.on('connect', () => {
+                const statusEl = isUser ? connectionStatus : itConnectionStatus;
+                statusEl.textContent = '● connected';
+                statusEl.className = 'status-badge online';
+                if (isIT) {
+                    itStatusText.textContent = 'Connected';
+                    socket.emit('it-join');
+                }
+            });
+
+            socket.on('disconnect', () => {
+                const statusEl = isUser ? connectionStatus : itConnectionStatus;
+                statusEl.textContent = '● disconnected';
+                statusEl.className = 'status-badge';
+                if (isIT) itStatusText.textContent = 'Disconnected';
+            });
+
+            socket.on('connect_error', () => {
+                const statusEl = isUser ? connectionStatus : itConnectionStatus;
+                statusEl.textContent = '● error';
+                statusEl.className = 'status-badge';
+            });
+
+            // ─── USER EVENTS ──────────────────────────
+            if (isUser) {
+                socket.on('it-answer', async (data) => {
+                    if (!peerConnection) return;
+                    try {
+                        await peerConnection.setRemoteDescription(
+                            new RTCSessionDescription(data.sdp)
+                        );
+                    } catch (e) { console.error('setRemoteDescription error:', e); }
+                });
+                socket.on('it-ice-candidate', async (data) => {
+                    if (!peerConnection) return;
+                    try {
+                        await peerConnection.addIceCandidate(
+                            new RTCIceCandidate(data.candidate)
+                        );
+                    } catch (e) { console.warn('ICE add error:', e); }
+                });
+                socket.on('it-mic-state', (data) => {
+                    console.log(`IT mic ${data.on ? 'ON' : 'OFF'}`);
+                });
+                socket.on('session-ended', () => {
+                    alert('The IT session has ended.');
+                    leaveSession();
+                });
+            }
+
+            // ─── IT EVENTS ─────────────────────────────
+            if (isIT) {
+                socket.on('user-joined', (data) => {
+                    itStatusText.textContent = `User ${data.name} joined`;
+                });
+                socket.on('user-offer', async (data) => {
+                    await handleUserOffer(data.userId, data.name, data.sdp);
+                });
+                socket.on('user-ice-candidate', async (data) => {
+                    const peer = userPeers.get(data.userId);
+                    if (!peer) return;
+                    try {
+                        await peer.pc.addIceCandidate(
+                            new RTCIceCandidate(data.candidate)
+                        );
+                    } catch (e) { console.warn('ICE add error:', e); }
+                });
+                socket.on('user-left', (data) => {
+                    removeUser(data.userId);
+                });
+                socket.on('user-mic-state', (data) => {
+                    const peer = userPeers.get(data.userId);
+                    if (peer) {
+                        peer.micOn = data.on;
+                        updateGridItemMic(data.userId, data.on);
+                    }
+                });
+                socket.on('existing-users', (users) => {
+                    users.forEach(u => addUserPlaceholder(u.userId, u.name));
+                });
+            }
+        }
+
+        // ────────────────────────────────────────────────
+        //  USER LOGIC (same as before)
+        // ────────────────────────────────────────────────
+        async function joinSession() {
+            const name = userNameInput.value.trim() || 'User';
+            userName = name;
+            userNameDisplay.textContent = `👤 ${userName}`;
+            if (!socket || !socket.connected) {
+                initSocket();
+                await new Promise(r => setTimeout(r, 300));
+            }
+            socket.emit('user-join', { name: userName });
+            isJoined = true;
+            joinArea.classList.add('hidden');
+            userControls.classList.remove('hidden');
+            connectionStatus.textContent = '● joined';
+            connectionStatus.className = 'status-badge online';
+            createPeerConnection();
+            streamStatus.textContent = '📡 waiting to share';
+        }
+
+        function createPeerConnection() {
+            if (peerConnection) { peerConnection.close(); peerConnection = null; }
+            const pc = new RTCPeerConnection({ iceServers: CONFIG.stunServers });
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('user-ice-candidate', { candidate: event.candidate });
+                }
+            };
+            pc.onconnectionstatechange = () => {
+                if (pc.connectionState === 'connected') streamStatus.textContent = '📡 connected to IT';
+                else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed')
+                    streamStatus.textContent = '📡 connection lost';
+            };
+            pc.ontrack = (event) => {
+                if (event.track.kind === 'audio') {
+                    const audioEl = new Audio();
+                    audioEl.srcObject = new MediaStream([event.track]);
+                    audioEl.autoplay = true;
+                    event.track._audioElement = audioEl;
+                    if (!isSpeakerOn) audioEl.muted = true;
+                    event.track.onended = () => { audioEl.pause(); audioEl.srcObject = null; };
+                }
+            };
+            peerConnection = pc;
+            return pc;
+        }
+
+        async function toggleScreenShare() {
+            if (isScreenSharing) { stopScreenShare(); return; }
+            try {
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: 'always' },
+                    audio: false,
+                });
+                screenStream = stream;
+                isScreenSharing = true;
+                selfPreview.srcObject = stream;
+                previewPlaceholder.classList.add('hidden');
+                const videoTrack = stream.getVideoTracks()[0];
+                if (videoTrack) {
+                    const sender = peerConnection.addTrack(videoTrack, stream);
+                    videoTrack._sender = sender;
+                }
+                videoTrack.onended = () => stopScreenShare();
+                await createAndSendOffer();
+                shareBtn.classList.add('active');
+                shareBtn.querySelector('.dot').style.background = '#2a6df4';
+                streamStatus.textContent = '📡 sharing screen';
+                shareBtn.innerHTML =
+                    `<span class="btn-icon">🖥️</span> Stop Sharing <span class="dot" style="background:#2a6df4;"></span>`;
+            } catch (err) {
+                alert('Could not share screen: ' + err.message);
+            }
+        }
+
+        function stopScreenShare() {
+            if (screenStream) {
+                screenStream.getTracks().forEach(t => {
+                    t.stop();
+                    if (t._sender) peerConnection.removeTrack(t._sender);
+                });
+                screenStream = null;
+            }
+            isScreenSharing = false;
+            selfPreview.srcObject = null;
+            previewPlaceholder.classList.remove('hidden');
+            shareBtn.classList.remove('active');
+            shareBtn.querySelector('.dot').style.background = '#bcc8d6';
+            streamStatus.textContent = '📡 not sharing';
+            shareBtn.innerHTML = `<span class="btn-icon">🖥️</span> Share Screen <span class="dot"></span>`;
+        }
+
+        async function toggleMic() {
+            if (isMicOn) {
+                if (micStream) {
+                    micStream.getTracks().forEach(t => {
+                        t.stop();
+                        if (t._sender) peerConnection.removeTrack(t._sender);
+                    });
+                    micStream = null;
+                }
+                isMicOn = false;
+                micBtn.classList.remove('active-mic');
+                micBtn.querySelector('.dot').style.background = '#bcc8d6';
+                socket.emit('user-mic-toggle', { on: false });
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true },
+                });
+                micStream = stream;
+                isMicOn = true;
+                const audioTrack = stream.getAudioTracks()[0];
+                if (audioTrack) {
+                    const sender = peerConnection.addTrack(audioTrack, stream);
+                    audioTrack._sender = sender;
+                }
+                micBtn.classList.add('active-mic');
+                micBtn.querySelector('.dot').style.background = '#e05353';
+                socket.emit('user-mic-toggle', { on: true });
+                if (isScreenSharing) await createAndSendOffer();
+            } catch (err) {
+                alert('Could not access microphone: ' + err.message);
+            }
+        }
+
+        function toggleSpeaker() {
+            isSpeakerOn = !isSpeakerOn;
+            speakerBtn.classList.toggle('active', isSpeakerOn);
+            speakerBtn.querySelector('.dot').style.background = isSpeakerOn ? '#2a6df4' : '#bcc8d6';
+            if (peerConnection) {
+                const receivers = peerConnection.getReceivers();
+                receivers.forEach(r => {
+                    if (r.track && r.track.kind === 'audio') {
+                        r.track.enabled = isSpeakerOn;
+                        if (r.track._audioElement) r.track._audioElement.muted = !isSpeakerOn;
+                    }
+                });
+            }
+        }
+
+        async function createAndSendOffer() {
+            if (!peerConnection) return;
+            try {
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                socket.emit('user-offer', { sdp: peerConnection.localDescription });
+            } catch (err) { console.error('Failed to create offer:', err); }
+        }
+
+        function leaveSession() {
+            if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+            if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+            if (peerConnection) { peerConnection.close(); peerConnection = null; }
+            isScreenSharing = false; isMicOn = false; isSpeakerOn = false; isJoined = false;
+            socket.emit('user-leave');
+            socket.disconnect();
+            joinArea.classList.remove('hidden');
+            userControls.classList.add('hidden');
+            selfPreview.srcObject = null;
+            previewPlaceholder.classList.remove('hidden');
+            shareBtn.classList.remove('active');
+            shareBtn.querySelector('.dot').style.background = '#bcc8d6';
+            shareBtn.innerHTML = `<span class="btn-icon">🖥️</span> Share Screen <span class="dot"></span>`;
+            micBtn.classList.remove('active-mic');
+            micBtn.querySelector('.dot').style.background = '#bcc8d6';
+            speakerBtn.classList.remove('active');
+            speakerBtn.querySelector('.dot').style.background = '#bcc8d6';
+            streamStatus.textContent = '📡 left';
+            connectionStatus.textContent = '● left';
+            connectionStatus.className = 'status-badge';
+            window.location.reload();
+        }
+
+        // ────────────────────────────────────────────────
+        //  IT LOGIC (same as before)
+        // ────────────────────────────────────────────────
+        function addUserPlaceholder(userId, name) {
+            if (userPeers.has(userId)) return;
+            const item = document.createElement('div');
+            item.className = 'grid-item';
+            item.id = `grid-${userId}`;
+            item.innerHTML = `
+                <video id="video-${userId}" autoplay playsinline muted></video>
+                <div class="label">
+                    <span>${escapeHtml(name)}</span>
+                    <span class="mic-indicator" id="mic-ind-${userId}">🔇</span>
+                </div>
+            `;
+            streamGrid.appendChild(item);
+            emptyGrid.classList.add('hidden');
+            userPeers.set(userId, {
+                name: name,
+                pc: null,
+                stream: null,
+                micOn: false,
+                element: item,
+                videoEl: item.querySelector('video'),
+                micInd: item.querySelector('.mic-indicator'),
+            });
+            updateUserCount();
+        }
+
+        async function handleUserOffer(userId, name, sdp) {
+            let peer = userPeers.get(userId);
+            if (!peer) { addUserPlaceholder(userId, name); peer = userPeers.get(userId); }
+            peer.name = name;
+            let pc = peer.pc;
+            if (!pc) {
+                pc = new RTCPeerConnection({ iceServers: CONFIG.stunServers });
+                peer.pc = pc;
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        socket.emit('it-ice-candidate', { userId, candidate: event.candidate });
+                    }
+                };
+                pc.ontrack = (event) => {
+                    if (event.track.kind === 'video') {
+                        const videoEl = peer.videoEl;
+                        if (videoEl) {
+                            const stream = new MediaStream([event.track]);
+                            videoEl.srcObject = stream;
+                            peer.stream = stream;
+                            videoEl.play().catch(() => {});
+                        }
+                    } else if (event.track.kind === 'audio') {
+                        const audioEl = new Audio();
+                        audioEl.srcObject = new MediaStream([event.track]);
+                        audioEl.autoplay = true;
+                        audioEl.muted = !isItSpeakerOn;
+                        event.track._audioElement = audioEl;
+                        if (peer.micOn) {
+                            peer.micInd.textContent = '🎤';
+                            peer.micInd.className = 'mic-indicator on';
+                        }
+                    }
+                };
+                pc.onconnectionstatechange = () => {
+                    if (pc.connectionState === 'connected') {
+                        itStatusText.textContent = `Connected to ${name}`;
+                    }
+                };
+                if (itMicStream && isItMicOn) {
+                    const audioTrack = itMicStream.getAudioTracks()[0];
+                    if (audioTrack) pc.addTrack(audioTrack, itMicStream);
+                }
+            }
+            try {
+                await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                socket.emit('it-answer', { userId, sdp: pc.localDescription });
+            } catch (err) { console.error(`Error handling offer from ${name}:`, err); }
+        }
+
+        function removeUser(userId) {
+            const peer = userPeers.get(userId);
+            if (peer) {
+                if (peer.pc) peer.pc.close();
+                if (peer.stream) peer.stream.getTracks().forEach(t => t.stop());
+                if (peer.element) peer.element.remove();
+                userPeers.delete(userId);
+                updateUserCount();
+                if (userPeers.size === 0) emptyGrid.classList.remove('hidden');
+            }
+        }
+
+        function updateGridItemMic(userId, on) {
+            const peer = userPeers.get(userId);
+            if (peer && peer.micInd) {
+                peer.micOn = on;
+                if (on) { peer.micInd.textContent = '🎤'; peer.micInd.className = 'mic-indicator on'; }
+                else { peer.micInd.textContent = '🔇'; peer.micInd.className = 'mic-indicator'; }
+            }
+        }
+
+        function updateUserCount() {
+            const count = userPeers.size;
+            userCountBadge.textContent = `👥 ${count} user${count !== 1 ? 's' : ''}`;
+            if (count > 0) emptyGrid.classList.add('hidden');
+            else emptyGrid.classList.remove('hidden');
+        }
+
+        async function toggleItMic() {
+            if (isItMicOn) {
+                if (itMicStream) { itMicStream.getTracks().forEach(t => t.stop()); itMicStream = null; }
+                isItMicOn = false;
+                itMicBtn.classList.remove('active-mic');
+                itMicBtn.querySelector('.dot').style.background = '#bcc8d6';
+                socket.emit('it-mic-state', { on: false });
+                itStatusText.textContent = 'Mic OFF';
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true },
+                });
+                itMicStream = stream;
+                isItMicOn = true;
+                userPeers.forEach((peer, userId) => {
+                    if (peer.pc) {
+                        const audioTrack = stream.getAudioTracks()[0];
+                        if (audioTrack) {
+                            peer.pc.addTrack(audioTrack, stream);
+                            renegotiateWithUser(userId, peer);
+                        }
+                    }
+                });
+                itMicBtn.classList.add('active-mic');
+                itMicBtn.querySelector('.dot').style.background = '#e05353';
+                socket.emit('it-mic-state', { on: true });
+                itStatusText.textContent = 'Mic ON';
+            } catch (err) {
+                alert('Could not access microphone: ' + err.message);
+            }
+        }
+
+        async function renegotiateWithUser(userId, peer) {
+            try {
+                const offer = await peer.pc.createOffer();
+                await peer.pc.setLocalDescription(offer);
+                socket.emit('it-answer', { userId, sdp: peer.pc.localDescription });
+            } catch (err) { console.error('Renegotiation error:', err); }
+        }
+
+        function toggleItSpeaker() {
+            isItSpeakerOn = !isItSpeakerOn;
+            itSpeakerBtn.classList.toggle('active', isItSpeakerOn);
+            itSpeakerBtn.querySelector('.dot').style.background = isItSpeakerOn ? '#2a6df4' : '#bcc8d6';
+            userPeers.forEach((peer) => {
+                if (peer.pc) {
+                    const receivers = peer.pc.getReceivers();
+                    receivers.forEach(r => {
+                        if (r.track && r.track.kind === 'audio') {
+                            r.track.enabled = isItSpeakerOn;
+                            if (r.track._audioElement) r.track._audioElement.muted = !isItSpeakerOn;
+                        }
+                    });
+                }
+            });
+            itStatusText.textContent = isItSpeakerOn ? 'Speaker ON' : 'Speaker OFF';
+        }
+
+        // ────────────────────────────────────────────────
+        //  UTILITY
+        // ────────────────────────────────────────────────
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // ────────────────────────────────────────────────
+        //  EVENT BINDING
+        // ────────────────────────────────────────────────
+
+        // ─── USER ──────────────────────────────────────
+        if (isUser) {
+            joinBtn.addEventListener('click', joinSession);
+            userNameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinSession(); });
+            shareBtn.addEventListener('click', toggleScreenShare);
+            micBtn.addEventListener('click', toggleMic);
+            speakerBtn.addEventListener('click', toggleSpeaker);
+            leaveBtn.addEventListener('click', leaveSession);
+
+            // IT Login button
+            itLoginBtn.addEventListener('click', () => {
+                const pwd = prompt('Enter IT password:');
+                if (pwd === IT_PASSWORD) {
+                    // Switch to IT mode via URL parameter
+                    const url = new URL(window.location);
+                    url.searchParams.set('it', '1');
+                    window.location.href = url.toString();
+                } else if (pwd !== null) {
+                    alert('Incorrect password');
+                }
+            });
+        }
+
+        // ─── IT ────────────────────────────────────────
+        if (isIT) {
+            itMicBtn.addEventListener('click', toggleItMic);
+            itSpeakerBtn.addEventListener('click', toggleItSpeaker);
+            itSpeakerBtn.classList.add('active');
+            itSpeakerBtn.querySelector('.dot').style.background = '#2a6df4';
+            isItSpeakerOn = true;
+
+            // Back to User button
+            backToUserBtn.addEventListener('click', () => {
+                // Remove ?it=1 and reload
+                const url = new URL(window.location);
+                url.searchParams.delete('it');
+                window.location.href = url.toString();
+            });
+        }
+
+        // ────────────────────────────────────────────────
+        //  INIT
+        // ────────────────────────────────────────────────
+        if (isUser) {
+            const saved = localStorage.getItem('remoteSupportUserName');
+            if (saved) userNameInput.value = saved;
+            userNameInput.addEventListener('change', () => {
+                localStorage.setItem('remoteSupportUserName', userNameInput.value);
+            });
+            initSocket();
+        }
+
+        if (isIT) {
+            initSocket();
+            emptyGrid.classList.remove('hidden');
+            itStatusText.textContent = 'Waiting for users...';
+        }
+
+        console.log(`🚀 Remote Support - ${isUser ? 'User' : 'IT'} mode`);
+        console.log(`📡 Server: ${CONFIG.serverUrl}`);
+    </script>
+</body>
+</html>
