@@ -179,9 +179,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startScreenShare(resultCode: Int, data: Intent) {
-        // Foreground service must be running BEFORE MediaProjection starts (Android 10+ requirement)
+        // Foreground service must be CONFIRMED running BEFORE MediaProjection capture starts
+        // (Android 14 / targetSdk 34 requirement). startForegroundService() only requests the
+        // start and returns immediately — it does NOT wait for startForeground() to actually
+        // run inside the service. Starting capture right after calling it is a race condition
+        // that throws a SecurityException on Android 14. So we wait for the service's callback.
+        ScreenCaptureService.onForegroundStarted = {
+            runOnUiThread { beginCapture(data) }
+        }
         ContextCompat.startForegroundService(this, Intent(this, ScreenCaptureService::class.java))
+    }
 
+    private fun beginCapture(data: Intent) {
         val capturer = ScreenCapturerAndroid(data, object : android.media.projection.MediaProjection.Callback() {
             override fun onStop() {
                 runOnUiThread { stopScreenShare() }
@@ -208,6 +217,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopScreenShare() {
+        ScreenCaptureService.onForegroundStarted = null
         screenCapturer?.stopCapture()
         screenCapturer?.dispose()
         screenCapturer = null
