@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.RemoteSupport" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#2A6DF4</item>
+    </style>
+</resources>
