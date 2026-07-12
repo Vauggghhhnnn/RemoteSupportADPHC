@@ -269,12 +269,13 @@ class MainActivity : AppCompatActivity() {
     private fun renegotiate() {
         val pc = peerConnection ?: return
         pc.createOffer(object : SimpleSdpObserver() {
-            override fun onCreateSuccess(desc: SessionDescription) {
-                pc.setLocalDescription(SimpleSdpObserver(), desc)
-                val sdpJson = JSONObject().put("type", "offer").put("sdp", desc.description)
-                signaling.sendOffer(sdpJson)
-            }
-        }, MediaConstraints())
+       override fun onCreateSuccess(desc: SessionDescription?) {
+           if (desc == null) return
+           pc.setLocalDescription(SimpleSdpObserver(), desc)
+           val sdpJson = JSONObject().put("type", "offer").put("sdp", desc.description)
+           signaling.sendOffer(sdpJson)
+       }
+   }, MediaConstraints())
     }
 
     // ─── LEAVE ──────────────────────────────────────────────────
