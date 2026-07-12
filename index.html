@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Remote Support</title>
     <style>
-        /* ---------- RESET & BASE ---------- */
+        /* (same styles as before – no changes) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -301,10 +301,7 @@
     <!-- ============================================================ -->
     <div class="app" id="userApp">
         <header style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-            <h1>
-                🖥️ Remote Support
-                <small>User</small>
-            </h1>
+            <h1>🖥️ Remote Support <small>User</small></h1>
             <span class="status-badge" id="connectionStatus">● connecting</span>
             <span id="userViewingStatus" class="user-status">👀 Not being viewed</span>
             <button class="header-btn primary" id="itLoginBtn">🔐 IT Login</button>
@@ -353,10 +350,7 @@
     <!-- ============================================================ -->
     <div class="app hidden" id="itApp">
         <header style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-            <h1>
-                🛠️ IT Control Panel
-                <small>Support</small>
-            </h1>
+            <h1>🛠️ IT Control Panel <small>Support</small></h1>
             <span class="status-badge" id="itConnectionStatus">● connecting</span>
             <button class="refresh-btn" id="refreshBtn">⟳ Refresh</button>
             <button class="header-btn" id="backToUserBtn">← Back to User</button>
@@ -377,7 +371,6 @@
         </div>
 
         <div class="it-main">
-            <!-- Focused user (large view) -->
             <div class="it-focus" id="itFocusArea">
                 <div class="placeholder" id="focusPlaceholder">Click on a user below to view and support them.</div>
                 <div id="focusContent" class="hidden">
@@ -390,11 +383,9 @@
                     </div>
                 </div>
             </div>
-
-            <!-- User grid -->
             <div id="gridContainer">
                 <div class="grid" id="streamGrid"></div>
-                <div class="empty-grid" id="emptyGrid">No users sharing their screen yet.</div>
+                <div class="empty-grid" id="emptyGrid">No users have joined yet.</div>
             </div>
         </div>
     </div>
@@ -406,7 +397,7 @@
     </script>
     <script>
         // ────────────────────────────────────────────────
-        //  CONFIG – POINTS TO YOUR LIVE BACKEND
+        //  CONFIG
         // ────────────────────────────────────────────────
         const CONFIG = {
             serverUrl: "https://remotesupportadphc.onrender.com",
@@ -415,7 +406,7 @@
         const IT_PASSWORD = 'admin123';
 
         // ────────────────────────────────────────────────
-        //  DETECT MODE (via URL parameter ?it=1)
+        //  DETECT MODE
         // ────────────────────────────────────────────────
         const urlParams = new URLSearchParams(window.location.search);
         const isIT = urlParams.get('it') === '1' || window.location.pathname.endsWith('it.html');
@@ -427,13 +418,8 @@
         const userApp = document.getElementById('userApp');
         const itApp = document.getElementById('itApp');
 
-        if (isUser) {
-            userApp.classList.remove('hidden');
-            itApp.classList.add('hidden');
-        } else {
-            userApp.classList.add('hidden');
-            itApp.classList.remove('hidden');
-        }
+        if (isUser) { userApp.classList.remove('hidden'); itApp.classList.add('hidden'); }
+        else { userApp.classList.add('hidden'); itApp.classList.remove('hidden'); }
 
         // ─── USER DOM ──────────────────────────────────
         const joinArea = document.getElementById('joinArea');
@@ -483,9 +469,9 @@
 
         let peerConnection = null;
 
-        // IT side: map userId -> { name, pc, stream, micOn, element, videoEl, micInd }
+        // IT side: map userId -> { name, pc, stream, micOn, element, videoEl, micInd, hasVideo }
         const userPeers = new Map();
-        let focusedUserId = null; // currently selected user ID
+        let focusedUserId = null;
 
         let itMicStream = null;
         let isItMicOn = false;
@@ -547,8 +533,7 @@
                     alert('The IT session has ended.');
                     leaveSession();
                 });
-                // IT focusing on this user
-                socket.on('it-focus', (data) => {
+                socket.on('it-focus', () => {
                     userViewingStatus.textContent = '👀 IT is viewing you';
                     userViewingStatus.className = 'user-status viewing';
                 });
@@ -560,12 +545,16 @@
 
             // ─── IT EVENTS ─────────────────────────────
             if (isIT) {
+                // When a new user joins, add them immediately (without screen share)
                 socket.on('user-joined', (data) => {
+                    addUserPlaceholder(data.userId, data.name);
                     itStatusText.textContent = `User ${data.name} joined`;
                 });
+
                 socket.on('user-offer', async (data) => {
                     await handleUserOffer(data.userId, data.name, data.sdp);
                 });
+
                 socket.on('user-ice-candidate', async (data) => {
                     const peer = userPeers.get(data.userId);
                     if (!peer) return;
@@ -575,33 +564,29 @@
                         );
                     } catch (e) { console.warn('ICE add error:', e); }
                 });
+
                 socket.on('user-left', (data) => {
-                    if (focusedUserId === data.userId) {
-                        clearFocus();
-                    }
+                    if (focusedUserId === data.userId) clearFocus();
                     removeUser(data.userId);
                 });
+
                 socket.on('user-mic-state', (data) => {
                     const peer = userPeers.get(data.userId);
                     if (peer) {
                         peer.micOn = data.on;
                         updateGridItemMic(data.userId, data.on);
-                        if (focusedUserId === data.userId) {
-                            // update focus mic indicator (optional)
-                        }
                     }
                 });
+
                 socket.on('existing-users', (users) => {
-                    // Clear existing grid and re-add
                     streamGrid.innerHTML = '';
                     userPeers.clear();
                     users.forEach(u => addUserPlaceholder(u.userId, u.name));
                     clearFocus();
                     updateUserCount();
                 });
-                // Disconnect response
+
                 socket.on('user-disconnected', (data) => {
-                    // Already removed via user-left, but handle anyway
                     removeUser(data.userId);
                     if (focusedUserId === data.userId) clearFocus();
                 });
@@ -657,7 +642,6 @@
         }
 
         async function toggleScreenShare() {
-            // Check if getDisplayMedia is available
             if (typeof navigator.mediaDevices?.getDisplayMedia !== 'function') {
                 alert('Screen sharing is not supported on this browser. Please use Chrome on Android or a desktop browser.');
                 return;
@@ -678,7 +662,7 @@
                     videoTrack._sender = sender;
                 }
                 videoTrack.onended = () => stopScreenShare();
-                await createAndSendOffer();
+                await renegotiate();
                 shareBtn.classList.add('active');
                 shareBtn.querySelector('.dot').style.background = '#2a6df4';
                 streamStatus.textContent = '📡 sharing screen';
@@ -704,6 +688,8 @@
             shareBtn.querySelector('.dot').style.background = '#bcc8d6';
             streamStatus.textContent = '📡 not sharing';
             shareBtn.innerHTML = `<span class="btn-icon">🖥️</span> Share Screen <span class="dot"></span>`;
+            // Re-negotiate to remove video track
+            renegotiate();
         }
 
         async function toggleMic() {
@@ -719,6 +705,7 @@
                 micBtn.classList.remove('active-mic');
                 micBtn.querySelector('.dot').style.background = '#bcc8d6';
                 socket.emit('user-mic-toggle', { on: false });
+                await renegotiate();
                 return;
             }
             try {
@@ -735,7 +722,7 @@
                 micBtn.classList.add('active-mic');
                 micBtn.querySelector('.dot').style.background = '#e05353';
                 socket.emit('user-mic-toggle', { on: true });
-                if (isScreenSharing) await createAndSendOffer();
+                await renegotiate();
             } catch (err) {
                 alert('Could not access microphone: ' + err.message);
             }
@@ -756,13 +743,13 @@
             }
         }
 
-        async function createAndSendOffer() {
+        async function renegotiate() {
             if (!peerConnection) return;
             try {
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
                 socket.emit('user-offer', { sdp: peerConnection.localDescription });
-            } catch (err) { console.error('Failed to create offer:', err); }
+            } catch (err) { console.error('Failed to renegotiate:', err); }
         }
 
         function leaveSession() {
@@ -797,6 +784,7 @@
             const item = document.createElement('div');
             item.className = 'grid-item';
             item.id = `grid-${userId}`;
+            // show "waiting for screen" placeholder
             item.innerHTML = `
                 <video id="video-${userId}" autoplay playsinline muted></video>
                 <div class="label">
@@ -818,8 +806,8 @@
                 element: item,
                 videoEl: item.querySelector('video'),
                 micInd: item.querySelector('.mic-indicator'),
+                hasVideo: false,
             });
-            // Attach event listeners
             item.querySelector('.focus-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
                 focusUser(userId);
@@ -828,7 +816,6 @@
                 e.stopPropagation();
                 disconnectUser(userId);
             });
-            // Click on item also focuses
             item.addEventListener('click', () => focusUser(userId));
             updateUserCount();
         }
@@ -853,9 +840,9 @@
                             const stream = new MediaStream([event.track]);
                             videoEl.srcObject = stream;
                             peer.stream = stream;
+                            peer.hasVideo = true;
                             videoEl.play().catch(() => {});
                         }
-                        // If this user is focused, also update focus video
                         if (focusedUserId === userId) {
                             const focusStream = new MediaStream([event.track]);
                             focusVideo.srcObject = focusStream;
@@ -871,10 +858,8 @@
                             peer.micInd.textContent = '🎤';
                             peer.micInd.className = 'mic-indicator on';
                         }
-                        // If this user is focused, unmute audio for focus
                         if (focusedUserId === userId) {
                             audioEl.muted = false;
-                            // Also we may want to attach to focus audio? But we already have audio element.
                         }
                     }
                 };
@@ -929,15 +914,12 @@
         function focusUser(userId) {
             const peer = userPeers.get(userId);
             if (!peer) return;
-            // Clear previous focus
             clearFocus();
             focusedUserId = userId;
-            // Update UI
             focusPlaceholder.classList.add('hidden');
             focusContent.classList.remove('hidden');
             focusName.textContent = peer.name;
-            // Get video stream from peer
-            if (peer.stream) {
+            if (peer.stream && peer.hasVideo) {
                 const videoTrack = peer.stream.getVideoTracks()[0];
                 if (videoTrack) {
                     const newStream = new MediaStream([videoTrack]);
@@ -947,9 +929,7 @@
             } else {
                 focusVideo.srcObject = null;
             }
-            // Notify user that IT is viewing them
             socket.emit('it-focus', { userId });
-            // Unmute audio for this user
             if (peer.pc) {
                 const receivers = peer.pc.getReceivers();
                 receivers.forEach(r => {
@@ -961,16 +941,13 @@
                     }
                 });
             }
-            // Highlight the grid item
             document.querySelectorAll('.grid-item').forEach(el => el.classList.remove('selected'));
             if (peer.element) peer.element.classList.add('selected');
         }
 
         function clearFocus() {
             if (focusedUserId) {
-                // Notify user that IT stopped viewing
                 socket.emit('it-unfocus', { userId: focusedUserId });
-                // Mute audio for that user if needed
                 const peer = userPeers.get(focusedUserId);
                 if (peer && peer.pc) {
                     const receivers = peer.pc.getReceivers();
@@ -996,7 +973,6 @@
         function disconnectUser(userId) {
             if (!confirm(`Disconnect user ${userPeers.get(userId)?.name || userId}?`)) return;
             socket.emit('it-disconnect-user', { userId });
-            // Server will emit user-left, which will remove the user
         }
 
         // ─── REFRESH ────────────────────────────────────
@@ -1027,15 +1003,16 @@
                 });
                 itMicStream = stream;
                 isItMicOn = true;
-                userPeers.forEach((peer, userId) => {
-                    if (peer.pc) {
-                        const audioTrack = stream.getAudioTracks()[0];
-                        if (audioTrack) {
-                            peer.pc.addTrack(audioTrack, stream);
+                const audioTrack = stream.getAudioTracks()[0];
+                if (audioTrack) {
+                    userPeers.forEach((peer, userId) => {
+                        if (peer.pc) {
+                            const sender = peer.pc.addTrack(audioTrack, stream);
+                            // Store sender for later removal if needed
                             renegotiateWithUser(userId, peer);
                         }
-                    }
-                });
+                    });
+                }
                 itMicBtn.classList.add('active-mic');
                 itMicBtn.querySelector('.dot').style.background = '#e05353';
                 socket.emit('it-mic-state', { on: true });
@@ -1062,9 +1039,6 @@
                     const receivers = peer.pc.getReceivers();
                     receivers.forEach(r => {
                         if (r.track && r.track.kind === 'audio') {
-                            // If focused, keep unmuted if speaker is on, else mute
-                            const isFocused = focusedUserId && userPeers.get(focusedUserId) === peer;
-                            // Apply speaker state to all
                             r.track.enabled = isItSpeakerOn;
                             if (r.track._audioElement) r.track._audioElement.muted = !isItSpeakerOn;
                         }
@@ -1086,8 +1060,6 @@
         // ────────────────────────────────────────────────
         //  EVENT BINDING
         // ────────────────────────────────────────────────
-
-        // ─── USER ──────────────────────────────────────
         if (isUser) {
             joinBtn.addEventListener('click', joinSession);
             userNameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinSession(); });
@@ -1108,7 +1080,6 @@
             });
         }
 
-        // ─── IT ────────────────────────────────────────
         if (isIT) {
             itMicBtn.addEventListener('click', toggleItMic);
             itSpeakerBtn.addEventListener('click', toggleItSpeaker);
@@ -1145,7 +1116,6 @@
             initSocket();
             emptyGrid.classList.remove('hidden');
             itStatusText.textContent = 'Waiting for users...';
-            // Auto-update is handled by socket events
         }
 
         console.log(`🚀 Remote Support - ${isUser ? 'User' : 'IT'} mode`);
