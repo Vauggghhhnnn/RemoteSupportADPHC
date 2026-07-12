@@ -279,6 +279,19 @@
             .join-area input { min-width: 120px; }
         }
         @media (max-width:420px) { .grid { grid-template-columns: 1fr; } }
+        .refresh-btn {
+            background: none;
+            border: 1px solid #dde3ea;
+            border-radius: 30px;
+            padding: 6px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .refresh-btn:hover { background: #f0f4fa; border-color: #bcc8d6; }
     </style>
 </head>
 <body>
@@ -345,6 +358,7 @@
                 <small>Support</small>
             </h1>
             <span class="status-badge" id="itConnectionStatus">● connecting</span>
+            <button class="refresh-btn" id="refreshBtn">⟳ Refresh</button>
             <button class="header-btn" id="backToUserBtn">← Back to User</button>
         </header>
         <hr />
@@ -452,6 +466,7 @@
         const focusVideo = document.getElementById('focusVideo');
         const focusName = document.getElementById('focusName');
         const focusDisconnectBtn = document.getElementById('focusDisconnectBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
 
         // ────────────────────────────────────────────────
         //  STATE
@@ -547,7 +562,6 @@
             if (isIT) {
                 socket.on('user-joined', (data) => {
                     itStatusText.textContent = `User ${data.name} joined`;
-                    // Auto-refresh: we'll add placeholder when offer arrives
                 });
                 socket.on('user-offer', async (data) => {
                     await handleUserOffer(data.userId, data.name, data.sdp);
@@ -578,7 +592,18 @@
                     }
                 });
                 socket.on('existing-users', (users) => {
+                    // Clear existing grid and re-add
+                    streamGrid.innerHTML = '';
+                    userPeers.clear();
                     users.forEach(u => addUserPlaceholder(u.userId, u.name));
+                    clearFocus();
+                    updateUserCount();
+                });
+                // Disconnect response
+                socket.on('user-disconnected', (data) => {
+                    // Already removed via user-left, but handle anyway
+                    removeUser(data.userId);
+                    if (focusedUserId === data.userId) clearFocus();
                 });
             }
         }
@@ -632,10 +657,9 @@
         }
 
         async function toggleScreenShare() {
-            // Check if on iOS Safari (no getDisplayMedia)
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            if (isIOS) {
-                alert('Screen sharing is not supported on iOS Safari. Please use a desktop browser.');
+            // Check if getDisplayMedia is available
+            if (typeof navigator.mediaDevices?.getDisplayMedia !== 'function') {
+                alert('Screen sharing is not supported on this browser. Please use Chrome on Android or a desktop browser.');
                 return;
             }
             if (isScreenSharing) { stopScreenShare(); return; }
@@ -914,7 +938,6 @@
             focusName.textContent = peer.name;
             // Get video stream from peer
             if (peer.stream) {
-                // We need to get the video track from the existing stream
                 const videoTrack = peer.stream.getVideoTracks()[0];
                 if (videoTrack) {
                     const newStream = new MediaStream([videoTrack]);
@@ -922,13 +945,11 @@
                     focusVideo.play().catch(() => {});
                 }
             } else {
-                // No stream yet – we'll receive it via ontrack later
                 focusVideo.srcObject = null;
             }
             // Notify user that IT is viewing them
             socket.emit('it-focus', { userId });
-            // Also we need to unmute audio for this user – we can find the audio track in the peer connection
-            // We'll do that by looking at the PC receivers
+            // Unmute audio for this user
             if (peer.pc) {
                 const receivers = peer.pc.getReceivers();
                 receivers.forEach(r => {
@@ -955,14 +976,13 @@
                     const receivers = peer.pc.getReceivers();
                     receivers.forEach(r => {
                         if (r.track && r.track.kind === 'audio') {
-                            r.track.enabled = isItSpeakerOn; // mute if speaker off
+                            r.track.enabled = isItSpeakerOn;
                             if (r.track._audioElement) {
                                 r.track._audioElement.muted = !isItSpeakerOn;
                             }
                         }
                     });
                 }
-                // Remove highlight
                 if (peer && peer.element) peer.element.classList.remove('selected');
                 focusedUserId = null;
             }
@@ -975,11 +995,19 @@
         // ─── DISCONNECT ──────────────────────────────────
         function disconnectUser(userId) {
             if (!confirm(`Disconnect user ${userPeers.get(userId)?.name || userId}?`)) return;
-            // Emit disconnect event to server
             socket.emit('it-disconnect-user', { userId });
-            // Also remove locally
-            removeUser(userId);
-            if (focusedUserId === userId) clearFocus();
+            // Server will emit user-left, which will remove the user
+        }
+
+        // ─── REFRESH ────────────────────────────────────
+        function refreshIT() {
+            if (!socket || !socket.connected) {
+                itStatusText.textContent = 'Reconnecting...';
+                initSocket();
+                return;
+            }
+            socket.emit('it-refresh');
+            itStatusText.textContent = 'Refreshing...';
         }
 
         // ─── IT MIC ─────────────────────────────────────
@@ -1034,17 +1062,11 @@
                     const receivers = peer.pc.getReceivers();
                     receivers.forEach(r => {
                         if (r.track && r.track.kind === 'audio') {
-                            // If focused, keep unmuted regardless of speaker? We'll apply speaker state if not focused.
+                            // If focused, keep unmuted if speaker is on, else mute
                             const isFocused = focusedUserId && userPeers.get(focusedUserId) === peer;
-                            if (!isFocused) {
-                                r.track.enabled = isItSpeakerOn;
-                                if (r.track._audioElement) r.track._audioElement.muted = !isItSpeakerOn;
-                            } else {
-                                // For focused, we keep audio enabled, but speaker setting can still mute if off
-                                // Actually, we want speaker to control all, so we apply to focused too
-                                r.track.enabled = isItSpeakerOn;
-                                if (r.track._audioElement) r.track._audioElement.muted = !isItSpeakerOn;
-                            }
+                            // Apply speaker state to all
+                            r.track.enabled = isItSpeakerOn;
+                            if (r.track._audioElement) r.track._audioElement.muted = !isItSpeakerOn;
                         }
                     });
                 }
@@ -1103,6 +1125,8 @@
             focusDisconnectBtn.addEventListener('click', () => {
                 if (focusedUserId) disconnectUser(focusedUserId);
             });
+
+            refreshBtn.addEventListener('click', refreshIT);
         }
 
         // ────────────────────────────────────────────────
@@ -1121,11 +1145,7 @@
             initSocket();
             emptyGrid.classList.remove('hidden');
             itStatusText.textContent = 'Waiting for users...';
-            // Auto-refresh: we already update via socket events
-            // Also we can set a periodic check if needed
-            setInterval(() => {
-                // Just to keep the UI responsive, but socket events handle it
-            }, 5000);
+            // Auto-update is handled by socket events
         }
 
         console.log(`🚀 Remote Support - ${isUser ? 'User' : 'IT'} mode`);
