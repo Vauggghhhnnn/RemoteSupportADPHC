@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Remote Support</title>
     <style>
-        /* ---------- RESET & BASE (same as before) ---------- */
+        /* ---------- RESET & BASE ---------- */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -191,7 +191,6 @@
         .gap-2 { gap: 10px; }
         .text-muted { color: #6a7f9a; font-size: 14px; }
         .w-full { width: 100%; }
-        /* small header buttons */
         .header-btn {
             background: none;
             border: 1px solid #dde3ea;
@@ -227,19 +226,16 @@
                 <small>User</small>
             </h1>
             <span class="status-badge" id="connectionStatus">● connecting</span>
-            <!-- IT Login Button -->
             <button class="header-btn primary" id="itLoginBtn">🔐 IT Login</button>
         </header>
         <hr />
 
-        <!-- JOIN -->
         <div class="join-area" id="joinArea">
             <label for="userNameInput">Your name</label>
             <input type="text" id="userNameInput" placeholder="e.g. Alice" value="User" />
             <button id="joinBtn">Join</button>
         </div>
 
-        <!-- MAIN CONTROLS (visible after join) -->
         <div id="userControls" class="hidden">
             <div class="controls">
                 <button class="btn" id="shareBtn">
@@ -281,7 +277,6 @@
                 <small>Support</small>
             </h1>
             <span class="status-badge" id="itConnectionStatus">● connecting</span>
-            <!-- Back to User button -->
             <button class="header-btn" id="backToUserBtn">← Back to User</button>
         </header>
         <hr />
@@ -312,14 +307,13 @@
     </script>
     <script>
         // ────────────────────────────────────────────────
-        //  CONFIG
+        //  CONFIG – POINTS TO YOUR LIVE BACKEND
         // ────────────────────────────────────────────────
         const CONFIG = {
-            serverUrl: window.location.origin,
+            serverUrl: "https://remotesupportadphc.onrender.com",
             stunServers: [{ urls: 'stun:stun.l.google.com:19302' }],
         };
-        // Hardcoded IT password (change as needed)
-        const IT_PASSWORD = 'Supportealge2026';
+        const IT_PASSWORD = 'admin123';
 
         // ────────────────────────────────────────────────
         //  DETECT MODE (via URL parameter ?it=1)
@@ -329,12 +323,11 @@
         const isUser = !isIT;
 
         // ────────────────────────────────────────────────
-        //  DOM REFS (user)
+        //  DOM REFS
         // ────────────────────────────────────────────────
         const userApp = document.getElementById('userApp');
         const itApp = document.getElementById('itApp');
 
-        // show the right app
         if (isUser) {
             userApp.classList.remove('hidden');
             itApp.classList.add('hidden');
@@ -376,20 +369,16 @@
         let userName = '';
         let isJoined = false;
 
-        // User media
         let screenStream = null;
         let micStream = null;
         let isScreenSharing = false;
         let isMicOn = false;
         let isSpeakerOn = false;
 
-        // WebRTC peer connection (user ↔ IT)
         let peerConnection = null;
 
-        // IT state: map userId -> { pc, stream, name, micOn }
         const userPeers = new Map();
 
-        // IT's own mic
         let itMicStream = null;
         let isItMicOn = false;
         let isItSpeakerOn = true;
@@ -486,7 +475,7 @@
         }
 
         // ────────────────────────────────────────────────
-        //  USER LOGIC (same as before)
+        //  USER LOGIC
         // ────────────────────────────────────────────────
         async function joinSession() {
             const name = userNameInput.value.trim() || 'User';
@@ -662,7 +651,7 @@
         }
 
         // ────────────────────────────────────────────────
-        //  IT LOGIC (same as before)
+        //  IT LOGIC
         // ────────────────────────────────────────────────
         function addUserPlaceholder(userId, name) {
             if (userPeers.has(userId)) return;
@@ -852,11 +841,9 @@
             speakerBtn.addEventListener('click', toggleSpeaker);
             leaveBtn.addEventListener('click', leaveSession);
 
-            // IT Login button
             itLoginBtn.addEventListener('click', () => {
                 const pwd = prompt('Enter IT password:');
                 if (pwd === IT_PASSWORD) {
-                    // Switch to IT mode via URL parameter
                     const url = new URL(window.location);
                     url.searchParams.set('it', '1');
                     window.location.href = url.toString();
@@ -874,9 +861,7 @@
             itSpeakerBtn.querySelector('.dot').style.background = '#2a6df4';
             isItSpeakerOn = true;
 
-            // Back to User button
             backToUserBtn.addEventListener('click', () => {
-                // Remove ?it=1 and reload
                 const url = new URL(window.location);
                 url.searchParams.delete('it');
                 window.location.href = url.toString();
