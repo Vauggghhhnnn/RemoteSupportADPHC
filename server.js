@@ -6,7 +6,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*", // Allow any origin (for testing)
+        origin: "*",
         methods: ["GET", "POST"]
     }
 });
@@ -22,9 +22,7 @@ io.on('connection', (socket) => {
         const userId = socket.id;
         users.set(userId, { name: data.name, socketId: socket.id });
         socket.join('room');
-        // Notify IT agents
         io.to('room').emit('user-joined', { userId, name: data.name });
-        // Send list of existing users to this user
         const existing = Array.from(users.values());
         socket.emit('existing-users', existing);
     });
@@ -67,6 +65,38 @@ io.on('connection', (socket) => {
 
     socket.on('it-mic-state', (data) => {
         socket.to('room').emit('it-mic-state', { on: data.on });
+    });
+
+    // ─── Focus / unfocus ─────────────────────────
+    socket.on('it-focus', (data) => {
+        io.to(data.userId).emit('it-focus', {});
+    });
+
+    socket.on('it-unfocus', (data) => {
+        io.to(data.userId).emit('it-unfocus', {});
+    });
+
+    // ─── Disconnect user ─────────────────────────
+    socket.on('it-disconnect-user', (data) => {
+        const userId = data.userId;
+        const user = users.get(userId);
+        if (user) {
+            // Notify everyone that user left
+            io.to('room').emit('user-left', { userId });
+            // Disconnect the user's socket
+            const userSocket = io.sockets.sockets.get(userId);
+            if (userSocket) {
+                userSocket.emit('session-ended');
+                userSocket.disconnect(true);
+            }
+            users.delete(userId);
+        }
+    });
+
+    // ─── IT refresh ──────────────────────────────
+    socket.on('it-refresh', () => {
+        const existing = Array.from(users.values());
+        socket.emit('existing-users', existing);
     });
 
     // ─── IT joins ────────────────────────────────
