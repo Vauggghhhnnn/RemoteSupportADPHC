@@ -54,5 +54,5 @@ dependencies {
 
     // Google's official WebRTC build for Android (includes ScreenCapturerAndroid,
     // the only supported way to capture the Android screen for a MediaStream)
-    implementation 'io.github.webrtc-sdk:android:125.6422.07.1'
+    implementation 'io.github.webrtc-sdk:android:144.7559.09'
 }
