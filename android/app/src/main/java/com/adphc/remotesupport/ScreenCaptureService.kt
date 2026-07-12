@@ -20,6 +20,13 @@ class ScreenCaptureService : Service() {
     companion object {
         const val CHANNEL_ID = "screen_capture_channel"
         const val NOTIFICATION_ID = 1001
+
+        // MainActivity sets this right before calling startForegroundService(),
+        // and we invoke it only once startForeground() has actually completed.
+        // This is required on Android 14+ (targetSdk 34): MediaProjection capture
+        // must not start until the foreground service of type mediaProjection is
+        // confirmed running, otherwise the system throws a SecurityException.
+        var onForegroundStarted: (() -> Unit)? = null
     }
 
     override fun onCreate() {
@@ -43,6 +50,11 @@ class ScreenCaptureService : Service() {
             .setOngoing(true)
             .build()
         startForeground(NOTIFICATION_ID, notification)
+
+        // Foreground service is now confirmed running — safe to start MediaProjection capture.
+        onForegroundStarted?.invoke()
+        onForegroundStarted = null
+
         return START_NOT_STICKY
     }
 
